@@ -12,7 +12,8 @@ more cheaply, entrenched detectors like Mahalanobis and linear probes, while als
 
 ## The 3D activation atlas
 
-<img width="1473" height="759" alt="image" src="https://github.com/user-attachments/assets/a13cfb57-7e0d-4968-8119-865499db5a4e" />
+<img width="1477" height="667" alt="image" src="https://github.com/user-attachments/assets/7bad7a36-3b2d-4ca0-abc2-8ce58d39bd53" />
+
 
 *Each glowing point is one input's last-token residual-stream activation, projected to 3D. Benign
 inputs (grey) stay centered while adversarial (GCG/PAIR) and far-OOD inputs fling outward as depth
