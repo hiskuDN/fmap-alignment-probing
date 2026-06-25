@@ -52,7 +52,9 @@ Test whether a safety-relevant direction learned on one model can be carried to 
 
 **Failure modes.** Anchors are the whole game. Cross-tokenizer and cross-family alignment is hard. Start with same-family-different-size or same-architecture-different-seed before attempting cross-family transfer.
 
-### Experiment 3: Runtime alignment-breakdown monitor — detect *and* localize (primary)
+### Experiment 3: Runtime alignment-breakdown monitor — detect *and* localize (falsified in Phase 0)
+
+> **Status (2026-06-25).** A Phase-0 MVP falsified the residual-as-detector core: the functional-map residual was dominated by a plain activation-space early→late residual and by Mahalanobis on both content and adversarial/OOD inputs (and *inverted* on far-OOD), with the trivial baseline already perfect (AUROC ≈ 1.0) — leaving no headroom for the spectral version. See [`exp3_mvp.md`](exp3_mvp.md). The live fmap bet moves to Experiment 2 (cross-model transfer), where single-model baselines don't apply. The description below is retained for the record.
 
 Use the functional-map residual as a runtime signal for adversarial or out-of-distribution inputs — but read both its *magnitude* (detection) and its *structure* (localization: where in the network the breakdown enters, and along which subspace). The contribution is the second half. A bare residual-magnitude detector is not novel and is not the pitch.
 
@@ -92,6 +94,7 @@ These apply to every experiment above and should be stated up front in any write
 - **Conceptual, not propositional.** Like SAEs, this aligns representation geometry, not propositions. It can tell you whether two geometries correspond; it will not natively give you "the model represents claim X as false." Capturing propositional content needs a binding or propositional layer on top (cf. Chalmers 2025).
 - **"Is the basis meaningful" persists.** A compact, low-rank operator is easier to read than a dense affinity matrix, but readability is not interpretability. The same caution that sinks naive intrinsic-interpretability hopes applies to the learned or spectral basis here.
 - **The comparison is against strong incumbents.** SAEs have a growing critical literature (faithfulness failures, feature absorption and hedging, sensitivity to hyperparameters, questions about beating random baselines), so the absolute bar is not high. But functional maps do not solve those SAE problems; they answer a different question. Frame each experiment as testing whether the method catches something the incumbents miss, or catches it cheaper, on testbeds with ground truth.
+- **Empirically tested once (2026-06-25), and it lost.** A Phase-0 MVP of the Experiment 3 residual monitor was beaten outright by trivial baselines — a plain activation-space early→late residual (AUROC 1.0 on adversarial/OOD) and Mahalanobis — confirming the analytic worry: in the single-model setting the coordinate frame is shared, so a plain diff is the right tool and the spectral machinery does not earn its place. fmap's remaining case rests on cross-model settings where those baselines structurally don't apply. See [`exp3_mvp.md`](exp3_mvp.md).
 
 ## References
 

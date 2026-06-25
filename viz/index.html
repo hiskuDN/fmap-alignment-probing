@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>FMAP — 3D Activation Atlas</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script src="https://cdn.plot.ly/plotly-2.32.0.min.js" charset="utf-8"></script>
+<style>
+  :root{ --bg:#0b0e14; --panel:#121723; --line:#222a3a; --fg:#e6e9ef; --muted:#8b95a7; }
+  *{ box-sizing:border-box; }
+  html,body{ margin:0; height:100%; background:var(--bg); color:var(--fg);
+    font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; }
+  header{ padding:16px 22px 4px; }
+  h1{ font-size:17px; margin:0 0 3px; font-weight:650; }
+  .sub{ color:var(--muted); font-size:12.5px; max-width:920px; }
+  .wrap{ padding:10px 22px 28px; }
+  .controls{ display:flex; flex-wrap:wrap; gap:18px 22px; align-items:center; margin:12px 0;
+    padding:11px 16px; background:var(--panel); border:1px solid var(--line); border-radius:12px; }
+  .controls label{ font-weight:600; margin-right:7px; color:var(--muted); text-transform:uppercase; font-size:11px; letter-spacing:.04em; }
+  .seg button,.btn{ border:1px solid var(--line); background:#0e131d; color:var(--fg); padding:5px 12px; cursor:pointer; font:inherit; border-radius:7px; }
+  .seg{ display:inline-flex; } .seg button{ border-radius:0; } .seg button:first-child{ border-radius:7px 0 0 7px; } .seg button:last-child{ border-radius:0 7px 7px 0; }
+  .seg button.on,.btn.on{ background:#2b6cff; border-color:#2b6cff; color:#fff; }
+  .seg button:disabled{ opacity:.35; cursor:not-allowed; }
+  input[type=range]{ width:300px; vertical-align:middle; accent-color:#2b6cff; }
+  #layerLabel{ font-weight:650; font-variant-numeric:tabular-nums; }
+  .chips{ display:flex; gap:7px; flex-wrap:wrap; }
+  .chip{ display:inline-flex; align-items:center; gap:6px; padding:4px 10px; border:1px solid var(--line);
+    border-radius:999px; cursor:pointer; user-select:none; background:#0e131d; font-size:12.5px; }
+  .chip .dot{ width:9px; height:9px; border-radius:50%; }
+  .chip.off{ opacity:.38; text-decoration:line-through; }
+  .grid{ display:grid; grid-template-columns:1.7fr 1fr; gap:16px; }
+  .card{ background:var(--panel); border:1px solid var(--line); border-radius:12px; position:relative; overflow:hidden; }
+  #stage{ width:100%; height:62vh; min-height:420px; display:block; }
+  #tip{ position:absolute; pointer-events:none; background:rgba(8,11,18,.94); border:1px solid var(--line);
+    border-radius:8px; padding:8px 10px; font-size:12px; max-width:340px; display:none; z-index:5; box-shadow:0 6px 24px rgba(0,0,0,.5); }
+  #tip b{ color:#fff; } #tip .s{ color:var(--muted); }
+  .panelhead{ padding:10px 12px 2px; display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
+  select{ font:inherit; padding:4px 8px; border:1px solid var(--line); border-radius:7px; background:#0e131d; color:var(--fg); }
+  #hist{ width:100%; height:300px; }
+  .note{ color:var(--muted); font-size:12px; padding:6px 12px; }
+  .hint{ position:absolute; left:12px; bottom:10px; color:var(--muted); font-size:11.5px; z-index:4; }
+  code{ background:#0e131d; padding:1px 5px; border-radius:4px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>FMAP — 3D Activation Atlas <span id="model" class="sub"></span></h1>
+  <div class="sub">Each glowing point is one input's last-token activation in 3D. <b>Drag to orbit, scroll to zoom.</b>
+    Scrub the layer slider (or hit <b>Play</b>) and watch the clouds <b>morph</b>: benign stays put while adversarial / OOD inputs fling outward with depth — the visual reason simple baselines nail them and the spectral residual doesn't.</div>
+</header>
+
+<div class="wrap">
+  <div class="controls">
+    <div><label>Projection</label>
+      <span class="seg" id="projSeg"><button data-proj="pca" class="on">PCA</button><button data-proj="umap">UMAP</button></span>
+    </div>
+    <div><label>Layer</label><input type="range" id="layer" min="0" value="0" /> <span id="layerLabel"></span></div>
+    <div><button class="btn" id="play">▶ Play</button> <button class="btn on" id="spin">⟳ Auto-rotate</button> <button class="btn" id="reset">Reset view</button></div>
+    <div class="chips" id="chips"></div>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <canvas id="stage"></canvas>
+      <div id="tip"></div>
+      <div class="hint">drag orbit · scroll zoom · right-drag pan · hover a point</div>
+    </div>
+    <div class="card">
+      <div class="panelhead">
+        <div><label>Detector</label>
+          <select id="det">
+            <option value="maha">Mahalanobis (distance)</option>
+            <option value="act">act_residual (early→late, no basis)</option>
+            <option value="fmap">fmap_residual (spectral)</option>
+          </select></div>
+        <div><label>vs.</label><select id="cls"></select></div>
+      </div>
+      <div id="hist"></div>
+      <div class="note" id="aurocNote"></div>
+      <div class="note">Score distribution, benign vs. the selected class. The spectral <code>fmap_residual</code> overlaps / <i>inverts</i> on gcg & ood (more-OOD → smaller residual); the trivial baselines separate cleanly.</div>
+    </div>
+  </div>
+</div>
+
+<script src="data.js"></script>
+<script>
+const D = window.FMAP_DATA;
+if(!D){ document.body.innerHTML="<p style='padding:24px'>Missing <code>data.js</code> — run <code>uv run modal run mvp/export_viz.py</code>.</p>"; throw new Error("no data"); }
+
+// bright palette for a dark scene (overrides export colors for visibility)
+const COL = { benign:"#c7ccd1", harmful:"#ffb000", gcg:"#ff4d5e", pair:"#b388ff", ood_random:"#22d3ee" };
+const DET_LABEL = { maha:"Mahalanobis", act:"act_residual", fmap:"fmap_residual" };
+const SPREAD = 55;
+let projection="pca", layerIdx=0, playing=false;
+
+const byClass = {}; D.classes.forEach(c=>byClass[c]=[]); D.points.forEach(p=>byClass[p.cls].push(p));
+const visible = {}; D.classes.forEach(c=>visible[c]=true);
+
+// ---------- normalization: center per-layer on benign centroid, single global scale ----------
+const norm = {}; // norm[proj] = { centroid:{layer:[x,y,z]}, scale:Number }
+function buildNorm(proj){
+  const cent = {}; let mags=[];
+  for(const L of D.layers){ const k=String(L);
+    const bc=[0,0,0]; const B=byClass["benign"];
+    B.forEach(p=>{ const c=p[proj][k]; bc[0]+=c[0]; bc[1]+=c[1]; bc[2]+=c[2]; });
+    bc[0]/=B.length; bc[1]/=B.length; bc[2]/=B.length; cent[k]=bc;
+    for(const cls of D.classes) for(const p of byClass[cls]){ const c=p[proj][k];
+      mags.push(Math.hypot(c[0]-bc[0], c[1]-bc[1], c[2]-bc[2])); }
+  }
+  mags.sort((a,b)=>a-b); const scale = mags[Math.floor(mags.length*0.9)] || 1;
+  norm[proj] = { centroid:cent, scale };
+}
+buildNorm("pca"); if(D.has_umap) buildNorm("umap");
+function np(proj,k,c){ const n=norm[proj], ce=n.centroid[k];
+  return [ (c[0]-ce[0])/n.scale*SPREAD, (c[1]-ce[1])/n.scale*SPREAD, (c[2]-ce[2])/n.scale*SPREAD ]; }
+
+// ---------- three.js scene ----------
+const canvas=document.getElementById("stage");
+const renderer=new THREE.WebGLRenderer({canvas, antialias:true, alpha:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+const scene=new THREE.Scene(); scene.fog=new THREE.FogExp2(0x0b0e14, 0.0016);
+const camera=new THREE.PerspectiveCamera(58, 2, 0.1, 5000); camera.position.set(0,18,150);
+const controls=new THREE.OrbitControls(camera, renderer.domElement);
+controls.enableDamping=true; controls.dampingFactor=0.08; controls.autoRotate=true; controls.autoRotateSpeed=0.7;
+
+function sprite(){ const c=document.createElement("canvas"); c.width=c.height=64; const g=c.getContext("2d");
+  const grd=g.createRadialGradient(32,32,0,32,32,32);
+  grd.addColorStop(0,"rgba(255,255,255,1)"); grd.addColorStop(.3,"rgba(255,255,255,.7)"); grd.addColorStop(1,"rgba(255,255,255,0)");
+  g.fillStyle=grd; g.fillRect(0,0,64,64); return new THREE.CanvasTexture(c); }
+const SP=sprite();
+
+const cloud={}; // cls -> {points, target Float32Array}
+for(const cls of D.classes){
+  const pts=byClass[cls], n=pts.length;
+  const pos=new Float32Array(n*3), tgt=new Float32Array(n*3);
+  for(let i=0;i<n;i++){ const v=np("pca",String(D.layers[0]),pts[i].pca[String(D.layers[0])]);
+    pos[i*3]=v[0]; pos[i*3+1]=v[1]; pos[i*3+2]=v[2]; tgt.set(v,i*3); }
+  const geom=new THREE.BufferGeometry(); geom.setAttribute("position", new THREE.BufferAttribute(pos,3));
+  const mat=new THREE.PointsMaterial({ size:3.2, map:SP, color:new THREE.Color(COL[cls]||"#aaa"),
+    transparent:true, depthWrite:false, blending:THREE.AdditiveBlending, sizeAttenuation:true, opacity:0.95 });
+  const P=new THREE.Points(geom, mat); P.userData.cls=cls; scene.add(P);
+  cloud[cls]={points:P, target:tgt};
+}
+
+function setTargets(){ const k=String(D.layers[layerIdx]);
+  for(const cls of D.classes){ const pts=byClass[cls], t=cloud[cls].target;
+    for(let i=0;i<pts.length;i++){ const v=np(projection,k,pts[i][projection]?pts[i][projection][k]:pts[i].pca[k]);
+      t[i*3]=v[0]; t[i*3+1]=v[1]; t[i*3+2]=v[2]; } } }
+
+// ---------- hover picking ----------
+const ray=new THREE.Raycaster(); ray.params.Points.threshold=1.4;
+const mouse=new THREE.Vector2(); const tip=document.getElementById("tip"); let mx=0,my=0;
+canvas.addEventListener("pointermove",e=>{ const r=canvas.getBoundingClientRect();
+  mx=e.clientX-r.left; my=e.clientY-r.top; mouse.x=(mx/r.width)*2-1; mouse.y=-(my/r.height)*2+1; });
+canvas.addEventListener("pointerleave",()=>tip.style.display="none");
+function pick(){ ray.setFromCamera(mouse,camera);
+  const objs=D.classes.filter(c=>visible[c]).map(c=>cloud[c].points);
+  const hit=ray.intersectObjects(objs,false)[0];
+  if(!hit){ tip.style.display="none"; return; }
+  const cls=hit.object.userData.cls, p=byClass[cls][hit.index];
+  tip.innerHTML=`<b style="color:${COL[cls]}">${cls}</b><br>${escapeHtml(p.prompt)}`+
+    `<br><span class="s">maha</span> ${p.scores.maha} · <span class="s">act</span> ${p.scores.act} · <span class="s">fmap</span> ${p.scores.fmap}`;
+  tip.style.display="block"; tip.style.left=Math.min(mx+14, canvas.clientWidth-350)+"px"; tip.style.top=(my+14)+"px"; }
+function escapeHtml(s){ return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+
+// ---------- loop ----------
+let last=performance.now(), acc=0;
+function animate(t){ requestAnimationFrame(animate);
+  const dt=t-last; last=t;
+  if(playing){ acc+=dt; if(acc>1200){ acc=0; layerIdx=(layerIdx+1)%D.layers.length; onLayer(); } }
+  for(const cls of D.classes){ const g=cloud[cls].points.geometry, a=g.attributes.position.array, tg=cloud[cls].target;
+    let moved=false; for(let i=0;i<a.length;i++){ const d=tg[i]-a[i]; if(Math.abs(d)>1e-3){ a[i]+=d*0.12; moved=true; } }
+    if(moved) g.attributes.position.needsUpdate=true; }
+  controls.update(); pick(); renderer.render(scene,camera); }
+
+// ---------- UI ----------
+function resize(){ const w=canvas.clientWidth, h=canvas.clientHeight;
+  renderer.setSize(w,h,false); camera.aspect=w/h; camera.updateProjectionMatrix(); }
+function onLayer(){ document.getElementById("layer").value=layerIdx;
+  document.getElementById("layerLabel").textContent=`${D.layers[layerIdx]}  (${layerIdx+1}/${D.layers.length})`; setTargets(); }
+
+document.getElementById("model").textContent="· "+D.model;
+const slider=document.getElementById("layer"); slider.max=D.layers.length-1;
+slider.addEventListener("input",e=>{ layerIdx=+e.target.value; onLayer(); });
+
+document.querySelectorAll("#projSeg button").forEach(b=>{
+  if(b.dataset.proj==="umap" && !D.has_umap) b.disabled=true;
+  b.addEventListener("click",()=>{ if(b.disabled) return; projection=b.dataset.proj;
+    document.querySelectorAll("#projSeg button").forEach(x=>x.classList.toggle("on",x===b)); setTargets(); }); });
+
+document.getElementById("play").addEventListener("click",e=>{ playing=!playing; e.target.classList.toggle("on",playing); e.target.textContent=playing?"⏸ Pause":"▶ Play"; });
+document.getElementById("spin").addEventListener("click",e=>{ controls.autoRotate=!controls.autoRotate; e.target.classList.toggle("on",controls.autoRotate); });
+document.getElementById("reset").addEventListener("click",()=>{ camera.position.set(0,18,150); controls.target.set(0,0,0); });
+
+const chips=document.getElementById("chips");
+for(const cls of D.classes){ const el=document.createElement("span"); el.className="chip";
+  el.innerHTML=`<span class="dot" style="background:${COL[cls]}"></span>${cls} (${byClass[cls].length})`;
+  el.addEventListener("click",()=>{ visible[cls]=!visible[cls]; cloud[cls].points.visible=visible[cls]; el.classList.toggle("off",!visible[cls]); });
+  chips.appendChild(el); }
+
+// ---------- score histogram (Plotly) ----------
+const clsSel=document.getElementById("cls");
+D.classes.filter(c=>c!=="benign").forEach(c=>{ const o=document.createElement("option"); o.value=c; o.textContent=c; clsSel.appendChild(o); });
+function drawHist(){ const det=document.getElementById("det").value, cls=clsSel.value;
+  const b=byClass["benign"].map(p=>p.scores[det]), a=byClass[cls].map(p=>p.scores[det]);
+  Plotly.react("hist",[
+    {x:b,type:"histogram",name:"benign",opacity:0.65,marker:{color:COL.benign},nbinsx:40},
+    {x:a,type:"histogram",name:cls,opacity:0.65,marker:{color:COL[cls]},nbinsx:40},
+  ],{ barmode:"overlay", paper_bgcolor:"rgba(0,0,0,0)", plot_bgcolor:"rgba(0,0,0,0)",
+      font:{color:"#c7ccd1"}, margin:{l:42,r:10,t:14,b:36}, legend:{orientation:"h",y:-0.2},
+      xaxis:{title:"score",gridcolor:"#222a3a"}, yaxis:{title:"count",gridcolor:"#222a3a"} },{displayModeBar:false,responsive:true});
+  const au=(D.auroc[cls]&&D.auroc[cls][det]!=null)?D.auroc[cls][det].toFixed(3):"—";
+  document.getElementById("aurocNote").innerHTML=`AUROC (benign vs <b>${cls}</b>, layers ${D.score_pair.early}→${D.score_pair.late}): <b>${au}</b> · detector: <b>${DET_LABEL[det]}</b>`; }
+document.getElementById("det").addEventListener("change",drawHist); clsSel.addEventListener("change",drawHist);
+
+window.addEventListener("resize",resize);
+resize(); onLayer(); drawHist(); requestAnimationFrame(animate);
+</script>
+</body>
+</html>

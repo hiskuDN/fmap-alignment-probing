@@ -1,0 +1,14 @@
+[project]
+name = "fmap-mvp"
+version = "0.1.0"
+description = "FMAP Experiment 3 — Phase 0 MVP: functional-map residual as a benign-vs-adversarial monitor"
+requires-python = ">=3.11"
+# Only the Modal client is needed locally. The heavy ML stack (torch, transformers,
+# scikit-learn, datasets) is installed inside the Modal GPU image, defined in mvp/phase0.py.
+dependencies = [
+    "modal>=0.64",
+]
+
+[tool.uv]
+# This is a runnable app, not an installable library — don't try to build/install it.
+package = false

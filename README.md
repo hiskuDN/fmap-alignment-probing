@@ -16,23 +16,32 @@ probes as a screener and localizer, tested on safety testbeds where ground truth
   cross-cutting caveats.
 - [`docs/RELATED_WORK.md`](docs/RELATED_WORK.md) — prior-art survey and baseline list behind the
   Experiment 3 framing (all arXiv IDs verified 2026-06-25).
+- [`docs/exp3_mvp.md`](docs/exp3_mvp.md) — Experiment 3 MVP: scope, run instructions, and the
+  Phase-0 results (the residual monitor was **falsified** — see verdict).
 
 ## The experiments at a glance
 
 | # | Experiment | Role | What it tests |
 |---|---|---|---|
-| 3 | Runtime alignment-breakdown monitor (detect + localize) | **primary — current focus** | Does the residual flag adversarial/OOD inputs *and* localize where/how the breakdown enters, as a readable operator rather than a bare score? |
+| 2 | Cross-model transfer of a safety probe | **next candidate (live bet)** | Does a refusal/lie-detection direction carry across models through the map, beating no-transfer and a naive linear map? |
 | 1 | Functional-map model diffing for hidden misalignment | secondary | Can `C` and its residual flag and localize a backdoor / emergent-misalignment fine-tune? |
-| 2 | Cross-model transfer of a safety probe | universality test | Does a refusal/lie-detection direction carry across models through the map? |
+| 3 | Runtime alignment-breakdown monitor (detect + localize) | **falsified (Phase 0)** | MVP: fmap residual beaten outright by a plain activation-space residual + Mahalanobis (perfect on adversarial/OOD), inverted on far-OOD. See `docs/exp3_mvp.md`. |
 | 4 | Checkpoint drift | exploratory | When in training does a safety-relevant structure form? |
 
 ## Status
 
-Proposal stage — no code yet. The bar is not "fill an empty space" but **beating entrenched
-methods (SAE crosscoders, linear probes) on tasks where they already work.** See the proposal's
-*Cross-cutting caveats* for the honest limitations (correlational-only signal, anchor dependence,
-adversarial evasion).
+First experiment executed (Phase 0 MVP on Modal). The bar was never "fill an empty space" but
+**beating entrenched methods (SAE crosscoders, linear probes, Mahalanobis) on tasks where they
+already work** — and the first test held to it.
 
-**Current focus — Experiment 3:** a runtime monitor that both *detects* adversarial/OOD inputs (residual magnitude) and *localizes* where the breakdown enters (residual structure, rendered as an operator-flow visualization), validated by patching.
+**Phase-0 finding (2026-06-25):** Experiment 3's residual-as-detector core is **falsified** — the
+functional-map residual was beaten outright by a plain activation-space early→late residual and by
+Mahalanobis (already perfect, AUROC ≈ 1.0, on adversarial/OOD inputs) and was *inverted* on far-OOD.
+The single-model setting has a shared coordinate frame, so a plain diff is the right tool and the
+spectral machinery is dead weight. Full results in [`docs/exp3_mvp.md`](docs/exp3_mvp.md).
+
+**Next:** Experiment 2 (cross-model transfer) — the one setting where the single-model baselines
+that just won structurally don't apply, and where LFM's published results live. The make-or-break
+test of whether fmap earns a place in safety.
 
 All references in the proposal were verified against arXiv on 2026-06-25.
