@@ -10,6 +10,8 @@ small, readable operator `C` between two spaces plus an alignment residual (what
 explain). This proposal asks whether that operator earns a place next to SAE crosscoders and linear
 probes as a screener and localizer, tested on safety testbeds where ground truth already exists.
 
+<img width="1473" height="759" alt="image" src="https://github.com/user-attachments/assets/a13cfb57-7e0d-4968-8119-865499db5a4e" />
+
 ## Contents
 
 - [`docs/proposal.md`](docs/proposal.md) — the full proposal: motivation, scope, four experiments, and
