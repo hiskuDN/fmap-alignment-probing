@@ -1,49 +1,66 @@
 # FMAP: Functional Maps for Alignment Probing
 
-A research proposal testing whether spectral representation-alignment operators — the
-[functional-maps](https://arxiv.org/abs/2406.14183) framework from geometry processing — are
-useful for **detecting and localizing hidden misalignment** in language models.
+Can a **functional-map alignment residual** act as a runtime monitor for adversarial /
+out-of-distribution inputs to a language model — flagging *and* localizing where the model's
+computation goes anomalous?
 
-The core bet: many interpretability-for-safety problems are really "compare two representation
-spaces and find where they diverge" problems, which is exactly what a functional map computes — a
-small, readable operator `C` between two spaces plus an alignment residual (what `C` cannot
-explain). This proposal asks whether that operator earns a place next to SAE crosscoders and linear
-probes as a screener and localizer, tested on safety testbeds where ground truth already exists.
+**The idea:** calibrate a functional map between an *early* and a *late* layer on benign text. At
+inference, the residual (what the map cannot explain) should spike on inputs that break the normal
+early→late flow. The bet is that this readable, unsupervised operator beats — or at least matches,
+more cheaply — entrenched detectors like Mahalanobis and linear probes, while also pointing at
+*where* the breakdown happens.
+
+## The 3D activation atlas
 
 <img width="1473" height="759" alt="image" src="https://github.com/user-attachments/assets/a13cfb57-7e0d-4968-8119-865499db5a4e" />
 
-## Contents
+*Each glowing point is one input's last-token residual-stream activation, projected to 3D. Benign
+inputs (grey) stay centered while adversarial (GCG/PAIR) and far-OOD inputs fling outward as depth
+increases.*
 
-- [`docs/proposal.md`](docs/proposal.md) — the full proposal: motivation, scope, four experiments, and
-  cross-cutting caveats.
-- [`docs/RELATED_WORK.md`](docs/RELATED_WORK.md) — prior-art survey and baseline list behind the
-  Experiment 3 framing (all arXiv IDs verified 2026-06-25).
-- [`docs/exp3_mvp.md`](docs/exp3_mvp.md) — Experiment 3 MVP: scope, run instructions, and the
-  Phase-0 results (the residual monitor was **falsified** — see verdict).
+[`viz/index.html`](viz/index.html) is an interactive 3D map of the model's internals — Three.js +
+Plotly, no build step. Open it directly:
 
-## The experiments at a glance
+```bash
+open viz/index.html                      # macOS; or serve viz/ and browse
+uv run modal run mvp/export_viz.py       # regenerate viz/data.js from a model
+```
 
-| # | Experiment | Role | What it tests |
-|---|---|---|---|
-| 2 | Cross-model transfer of a safety probe | **next candidate (live bet)** | Does a refusal/lie-detection direction carry across models through the map, beating no-transfer and a naive linear map? |
-| 1 | Functional-map model diffing for hidden misalignment | secondary | Can `C` and its residual flag and localize a backdoor / emergent-misalignment fine-tune? |
-| 3 | Runtime alignment-breakdown monitor (detect + localize) | **falsified (Phase 0)** | MVP: fmap residual beaten outright by a plain activation-space residual + Mahalanobis (perfect on adversarial/OOD), inverted on far-OOD. See `docs/exp3_mvp.md`. |
-| 4 | Checkpoint drift | exploratory | When in training does a safety-relevant structure form? |
+- **Orbit** (drag), **zoom** (scroll), **morph across layers** (slider / Play) — watch the manifold
+  reorganize with depth.
+- Toggle **PCA / UMAP**, toggle classes, **hover** a point for its prompt + detector scores.
+- The right panel histograms each detector's benign-vs-anomaly scores, with the AUROC.
 
-## Status
+**Why it matters:** the atlas makes the Phase-0 result *visible*. Adversarial/OOD inputs separate
+from benign by the late layers — which is exactly why a trivial distance/residual baseline nails
+them (AUROC ≈ 1.0), and why the spectral functional-map residual (which even *inverts* on far-OOD)
+does not earn its place.
 
-First experiment executed (Phase 0 MVP on Modal). The bar was never "fill an empty space" but
-**beating entrenched methods (SAE crosscoders, linear probes, Mahalanobis) on tasks where they
-already work** — and the first test held to it.
+## Status — Phase 0 (2026-06-25): falsified
 
-**Phase-0 finding (2026-06-25):** Experiment 3's residual-as-detector core is **falsified** — the
-functional-map residual was beaten outright by a plain activation-space early→late residual and by
-Mahalanobis (already perfect, AUROC ≈ 1.0, on adversarial/OOD inputs) and was *inverted* on far-OOD.
-The single-model setting has a shared coordinate frame, so a plain diff is the right tool and the
-spectral machinery is dead weight. Full results in [`docs/exp3_mvp.md`](docs/exp3_mvp.md).
+First test executed — a Phase-0 MVP on Modal (Qwen2.5-1.5B). The bar was never "fill an empty space"
+but **beating entrenched methods on tasks where they already work** — and the residual monitor
+didn't clear it.
 
-**Next:** Experiment 2 (cross-model transfer) — the one setting where the single-model baselines
-that just won structurally don't apply, and where LFM's published results live. The make-or-break
-test of whether fmap earns a place in safety.
+**The functional-map residual was beaten outright** by a plain activation-space early→late residual
+and by Mahalanobis (already perfect, AUROC ≈ 1.0, on adversarial/OOD inputs), and was *inverted* on
+far-OOD (more-OOD → smaller residual). In the single-model setting the coordinate frame is shared,
+so a plain diff is the right tool and the spectral machinery is dead weight. The residual-as-detector
+idea is dead; if fmap earns a place anywhere it's in cross-model settings, where these single-model
+baselines structurally don't apply.
 
-All references in the proposal were verified against arXiv on 2026-06-25.
+Full results, baselines, and reproduction: [`docs/exp3_mvp.md`](docs/exp3_mvp.md).
+
+## Repo layout
+
+**Code** (uv project; heavy deps run inside the Modal image)
+- `mvp/phase0.py` — content task (harmful vs. benign behaviors).
+- `mvp/phase0_diag.py` — k-sweep + spectral-vs-raw probe coverage diagnostic.
+- `mvp/phase0_adv.py` — adversarial/OOD task (GCG + PAIR + random-token OOD).
+- `mvp/export_viz.py` — exports 3D PCA/UMAP coords + scores for the atlas.
+- `viz/` — the interactive 3D activation atlas (`index.html` + generated `data.js`).
+
+**Docs**
+- [`docs/exp3_mvp.md`](docs/exp3_mvp.md) — MVP scope, run instructions, and the Phase-0 results.
+- [`docs/RELATED_WORK.md`](docs/RELATED_WORK.md) — prior-art survey + baselines (all arXiv IDs verified 2026-06-25).
+- [`docs/proposal.md`](docs/proposal.md) — the full research proposal and cross-cutting caveats (broader context).
