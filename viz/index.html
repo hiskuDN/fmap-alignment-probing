@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>FMAP — 3D Activation Atlas</title>
+<title>FMAP: 3D Activation Atlas</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
 <script src="https://cdn.plot.ly/plotly-2.32.0.min.js" charset="utf-8"></script>
@@ -46,9 +46,9 @@
 </head>
 <body>
 <header>
-  <h1>FMAP — 3D Activation Atlas <span id="model" class="sub"></span></h1>
+  <h1>FMAP: 3D Activation Atlas <span id="model" class="sub"></span></h1>
   <div class="sub">Each glowing point is one input's last-token activation in 3D. <b>Drag to orbit, scroll to zoom.</b>
-    Scrub the layer slider (or hit <b>Play</b>) and watch the clouds <b>morph</b>: benign stays put while adversarial / OOD inputs fling outward with depth — the visual reason simple baselines nail them and the spectral residual doesn't.</div>
+    Scrub the layer slider (or hit <b>Play</b>) and watch the clouds <b>morph</b>: benign stays put while adversarial / OOD inputs fling outward with depth, the visual reason simple baselines nail them and the spectral residual doesn't.</div>
 </header>
 
 <div class="wrap">
@@ -87,7 +87,7 @@
 <script src="data.js"></script>
 <script>
 const D = window.FMAP_DATA;
-if(!D){ document.body.innerHTML="<p style='padding:24px'>Missing <code>data.js</code> — run <code>uv run modal run mvp/export_viz.py</code>.</p>"; throw new Error("no data"); }
+if(!D){ document.body.innerHTML="<p style='padding:24px'>Missing <code>data.js</code>, run <code>uv run modal run mvp/export_viz.py</code>.</p>"; throw new Error("no data"); }
 
 // bright palette for a dark scene (overrides export colors for visibility)
 const COL = { benign:"#c7ccd1", harmful:"#ffb000", gcg:"#ff4d5e", pair:"#b388ff", ood_random:"#22d3ee" };
@@ -211,7 +211,7 @@ function drawHist(){ const det=document.getElementById("det").value, cls=clsSel.
   ],{ barmode:"overlay", paper_bgcolor:"rgba(0,0,0,0)", plot_bgcolor:"rgba(0,0,0,0)",
       font:{color:"#c7ccd1"}, margin:{l:42,r:10,t:14,b:36}, legend:{orientation:"h",y:-0.2},
       xaxis:{title:"score",gridcolor:"#222a3a"}, yaxis:{title:"count",gridcolor:"#222a3a"} },{displayModeBar:false,responsive:true});
-  const au=(D.auroc[cls]&&D.auroc[cls][det]!=null)?D.auroc[cls][det].toFixed(3):"—";
+  const au=(D.auroc[cls]&&D.auroc[cls][det]!=null)?D.auroc[cls][det].toFixed(3):", ";
   document.getElementById("aurocNote").innerHTML=`AUROC (benign vs <b>${cls}</b>, layers ${D.score_pair.early}→${D.score_pair.late}): <b>${au}</b> · detector: <b>${DET_LABEL[det]}</b>`; }
 document.getElementById("det").addEventListener("change",drawHist); clsSel.addEventListener("change",drawHist);
 

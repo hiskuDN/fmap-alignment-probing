@@ -1,30 +1,30 @@
-# Experiment 3 — Minimal Viable Experiment (scoping)
+# Experiment 3: Minimal Viable Experiment (scoping)
 
 *Scopes the cheapest run that can falsify the [Experiment 3](proposal.md) bet, and the open-source stack to build it on. Companion to [`proposal.md`](proposal.md) and [`RELATED_WORK.md`](RELATED_WORK.md).*
 
 ## The question this MVP answers
 
 1. **Signal:** does the functional-map alignment residual separate adversarial/OOD inputs from benign at all?
-2. **Edge:** does it beat (a) Mahalanobis-on-activations (Lee et al. 2018) and (b) the no-spectral-basis early→deep regressor (Mumcu & Yilmaz 2025) — the latter being "our idea minus the basis"?
+2. **Edge:** does it beat (a) Mahalanobis-on-activations (Lee et al. 2018) and (b) the no-spectral-basis early→deep regressor (Mumcu & Yilmaz 2025), the latter being "our idea minus the basis"?
 3. **Localization:** is the residual *structured* enough to point at a layer transition + subspace that patching confirms?
 
 If (1) fails, the idea is dead cheaply. If (1) passes but (2) fails, the spectral basis adds nothing and the honest result is "use the regressor." Only if (1)+(2)+(3) hold is there a paper.
 
-## Build-from stack (all open source; licenses not individually verified — confirm before redistribution)
+## Build-from stack (all open source; licenses not individually verified, confirm before redistribution)
 
 - **Activations + patching:** `TransformerLensOrg/TransformerLens` (cache residual stream; activation patching for the localization step).
 - **Functional-map primitives:** `RobinMagnet/pyFM` (Laplacian eigenfunctions, C-estimation, refinement).
-- **Detection baselines:** `kkirchheim/pytorch-ood` (Mahalanobis); port the early→deep residual idea from `furkanmumcu/Layer-Regression` (image-domain — reimplement for LLM layers).
+- **Detection baselines:** `kkirchheim/pytorch-ood` (Mahalanobis); port the early→deep residual idea from `furkanmumcu/Layer-Regression` (image-domain, reimplement for LLM layers).
 - **Lens baseline:** `AlignmentResearch/tuned-lens`.
 - **Data:** `JailbreakBench/jailbreakbench` + `artifacts` (benign + attack families); `centerforaisafety/HarmBench` to widen attack diversity.
 
-**Custom code (the only real build):** the LFM-on-representations adapter — kNN graph over activations → graph-Laplacian eigenfunctions → estimate `C` against the free identity anchors → per-input residual, with **Nyström out-of-sample extension** so new inputs can be scored against the benign-calibrated basis without recomputing the eigendecomposition.
+**Custom code (the only real build):** the LFM-on-representations adapter, kNN graph over activations → graph-Laplacian eigenfunctions → estimate `C` against the free identity anchors → per-input residual, with **Nyström out-of-sample extension** so new inputs can be scored against the benign-calibrated basis without recomputing the eigendecomposition.
 
 ## Protocol
 
-**Model.** A small open white-box instruct model for fast iteration. Phase 0 defaults to **Qwen2.5-1.5B-Instruct** (ungated/Apache-2.0 — no HF token friction), configurable up to **Qwen2.5-7B-Instruct** via a flag.
+**Model.** A small open white-box instruct model for fast iteration. Phase 0 defaults to **Qwen2.5-1.5B-Instruct** (ungated/Apache-2.0, no HF token friction), configurable up to **Qwen2.5-7B-Instruct** via a flag.
 
-**Map setup.** Intra-model, inter-layer: pick an early layer `ℓ_e` and a late layer `ℓ_l` (start ~25% and ~75% depth). Over a benign corpus, take last-token (or mean) residual-stream activations at both layers — identical tokens give a free identity correspondence. Build the graph, take the top `k` Laplacian eigenfunctions (start `k ≈ 64–128`), estimate `C` by regularized least squares. Residual `r(x) = ‖Φ_l(x) − Φ_e(x)·C‖`.
+**Map setup.** Intra-model, inter-layer: pick an early layer `ℓ_e` and a late layer `ℓ_l` (start ~25% and ~75% depth). Over a benign corpus, take last-token (or mean) residual-stream activations at both layers, identical tokens give a free identity correspondence. Build the graph, take the top `k` Laplacian eigenfunctions (start `k ≈ 64–128`), estimate `C` by regularized least squares. Residual `r(x) = ‖Φ_l(x) − Φ_e(x)·C‖`.
 
 **Data / splits.** Benign = JBB benign behaviors (+ a generic instruction set). Attacks = JBB artifacts grouped by family (PAIR, GCG, JailbreakChat, …). Calibrate `C` on benign only.
 
@@ -36,13 +36,13 @@ If (1) fails, the idea is dead cheaply. If (1) passes but (2) fails, the spectra
 
 ## Go / kill gates (run in order)
 
-- **Phase 0 — signal (½–1 day once data+model load):** residual AUROC vs benign on one attack family. Gate: AUROC ≫ 0.5. Kill if not.
-- **Phase 1 — edge:** beat Mahalanobis and the ported early→deep regressor on AUROC, and survive the cross-attack split where the linear probe collapses. Gate: ≥ baselines on held-out family.
-- **Phase 2 — localization:** patching the residual subspace suppresses the attack more than a random subspace, under the illusion controls. Gate: significant, stable effect.
+- **Phase 0 (signal, ½–1 day once data+model load):** residual AUROC vs benign on one attack family. Gate: AUROC ≫ 0.5. Kill if not.
+- **Phase 1 (edge):** beat Mahalanobis and the ported early→deep regressor on AUROC, and survive the cross-attack split where the linear probe collapses. Gate: ≥ baselines on held-out family.
+- **Phase 2 (localization):** patching the residual subspace suppresses the attack more than a random subspace, under the illusion controls. Gate: significant, stable effect.
 
 ## Setup (decided)
 
-- **Compute:** Modal (serverless GPU). Dependencies via **uv** — the heavy ML stack (torch, transformers, scikit-learn, datasets) lives in the Modal image; locally only the `modal` client is installed.
+- **Compute:** Modal (serverless GPU). Dependencies via **uv**, the heavy ML stack (torch, transformers, scikit-learn, datasets) lives in the Modal image; locally only the `modal` client is installed.
 - **Model:** Qwen2.5-1.5B-Instruct default (ungated, fast), bump to 7B via flag.
 - **Scope:** Phase 0 first (does the residual separate attack from benign at all?).
 
@@ -66,7 +66,7 @@ The job pulls a benign calibration corpus (Alpaca) + JailbreakBench harmful/beni
 
 Phase 0 ran on **Qwen2.5-1.5B-Instruct** via Modal. **Outcome: the functional-map residual is dominated by trivial baselines and is the wrong readout for these signals. Detection via the fmap residual is falsified.**
 
-### Run 1 — content task (harmful vs. benign behaviors), best AUROC
+### Run 1: content task (harmful vs. benign behaviors), best AUROC
 
 | method | AUROC |
 |---|---|
@@ -74,11 +74,11 @@ Phase 0 ran on **Qwen2.5-1.5B-Instruct** via Modal. **Outcome: the functional-ma
 | act_residual (early→late ridge, *no spectral basis*) | 0.917 |
 | **fmap_residual** | **0.649** |
 
-### Diagnostic — is the spectral basis at fault? (No.)
+### Diagnostic: is the spectral basis at fault? (No.)
 
 A linear probe on the spectral embedding scored **0.928** (≈ probe on raw activations, 0.959), while sweeping `k ∈ {64, 256, 512}` left the residual flat (0.649 → 0.657). So the basis *retains* the signal; the residual-of-map construction simply can't read it. Not an instantiation artifact.
 
-### Run 2 — computational-anomaly task (the "right" task), AUROC vs. benign
+### Run 2: computational-anomaly task (the "right" task), AUROC vs. benign
 
 | class | n | fmap_residual | act_residual | mahalanobis |
 |---|---|---|---|---|
@@ -90,7 +90,7 @@ A linear probe on the spectral embedding scored **0.928** (≈ probe on raw acti
 ### Verdict
 
 - The fmap residual **never beats** the baselines, on any class.
-- It is **inverted on far-OOD (0.245)**: KernelPCA `.transform` collapses far points to ≈0 (all RBF affinities vanish), so the residual *shrinks* as inputs get more OOD — a structural flaw of any benign-fit spectral-embedding residual, not specific to KernelPCA.
+- It is **inverted on far-OOD (0.245)**: KernelPCA `.transform` collapses far points to ≈0 (all RBF affinities vanish), so the residual *shrinks* as inputs get more OOD, a structural flaw of any benign-fit spectral-embedding residual, not specific to KernelPCA.
 - **`act_residual` = 1.000** on GCG/OOD: the plain activation-space early→late residual is already perfect, leaving **no headroom** for the spectral version. We did not pursue a graph-Laplacian + Nyström basis because a perfect baseline cannot be beaten.
 
 ### Positive byproduct
@@ -99,7 +99,7 @@ The **plain early→late activation residual** (≈ Mumcu & Yilmaz's image-domai
 
 ### Reassessment
 
-The residual-as-monitor falls to the point we derived analytically earlier: in the **single-model** setting the coordinate frame is shared, so a plain linear/activation diff is the right tool and the functional map's coordinate-free machinery is dead weight (here, worse — it inverts on OOD). fmap can only earn its place where incumbents structurally don't apply: **cross-model alignment** (no shared frame, no trivial distance baseline) — i.e. Experiment 2. Experiment 1 (intra-architecture diffing) shares the same shared-frame vulnerability. **Recommendation:** treat Experiment 2 (cross-model probe transfer) as the make-or-break test of whether fmap earns a place in safety at all; a clean negative there is a legitimate stopping point.
+The residual-as-monitor falls to the point we derived analytically earlier: in the **single-model** setting the coordinate frame is shared, so a plain linear/activation diff is the right tool and the functional map's coordinate-free machinery is dead weight (here, worse, it inverts on OOD). fmap can only earn its place where incumbents structurally don't apply: **cross-model alignment** (no shared frame, no trivial distance baseline), i.e. Experiment 2. Experiment 1 (intra-architecture diffing) shares the same shared-frame vulnerability. **Recommendation:** treat Experiment 2 (cross-model probe transfer) as the make-or-break test of whether fmap earns a place in safety at all; a clean negative there is a legitimate stopping point.
 
 ### Reproduction
 
