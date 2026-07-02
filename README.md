@@ -52,6 +52,12 @@ baselines structurally don't apply.
 
 Full results, baselines, and reproduction: [`docs/exp3_mvp.md`](docs/exp3_mvp.md).
 
+**Roadmap note (2026-07-02):** a cross-repo review in the sibling repo
+([`../param-decomp/docs/roadmap.md`](../param-decomp/docs/roadmap.md)) records the decision on fmap's
+remaining bet: Experiment 2 (cross-model probe transfer) is deferred pending its own go/kill call,
+and must pre-register a ridge/Procrustes-stitching baseline on the same anchors, with the
+anchor-efficiency curve (not single-number accuracy) as the only defensible edge.
+
 ## Repo layout
 
 **Code** (uv project; heavy deps run inside the Modal image)
