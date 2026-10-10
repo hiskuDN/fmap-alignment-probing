@@ -14,3 +14,8 @@ venv/
 .DS_Store
 .idea/
 .vscode/
+
+# Local agent / tooling config (machine-local, not project content)
+.agents/
+.claude/
+.codex-watch.json
